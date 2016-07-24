@@ -8,6 +8,8 @@ import java.util.Queue;
 
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.jsoup.select.NodeVisitor;
+import org.jsoup.nodes.Node;
 
 import redis.clients.jedis.Jedis;
 
@@ -54,8 +56,40 @@ public class WikiCrawler {
 	 * @throws IOException
 	 */
 	public String crawl(boolean testing) throws IOException {
-        // FILL THIS IN!
-		return null;
+        
+        String indexedPageUrl = null;
+        Elements paras = null;
+        Elements links = null;
+        String linkHref;
+        
+        if(testing == true){
+        	
+        	indexedPageUrl = queue.remove();
+        	paras = wf.readWikipedia(indexedPageUrl);
+        	
+        	index.indexPage(indexedPageUrl, paras);
+        	
+        	queueInternalLinks(paras);
+	        
+	        return indexedPageUrl;
+		
+		} else{
+			
+			indexedPageUrl = queue.remove();
+			
+			if(index.isIndexed(indexedPageUrl)){
+				return null;
+			}else{
+			
+			paras = wf.readWikipedia(indexedPageUrl);
+			index.indexPage(indexedPageUrl, paras);
+
+			queueInternalLinks(paras);
+	       
+	        return indexedPageUrl;
+			}
+		}
+
 	}
 	
 	/**
@@ -65,7 +99,21 @@ public class WikiCrawler {
 	 */
 	// NOTE: absence of access level modifier means package-level
 	void queueInternalLinks(Elements paragraphs) {
-        // FILL THIS IN!
+        for (Element paragraph: paragraphs) {
+            queueInternalLinks(paragraph);
+        }
+    }
+	
+	private void queueInternalLinks(Element paragraph) {
+       
+        Elements relurl = paragraph.select("a[href*=/wiki/]");
+        
+        for(Element link: relurl){
+    		link.setBaseUri(source);
+    		String linkHref = link.attr("abs:href");
+    		queue.offer(linkHref);
+    	}
+
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -85,8 +133,6 @@ public class WikiCrawler {
 		do {
 			res = wc.crawl(false);
 
-            // REMOVE THIS BREAK STATEMENT WHEN crawl() IS WORKING
-            break;
 		} while (res == null);
 		
 		Map<String, Integer> map = index.getCounts("the");
